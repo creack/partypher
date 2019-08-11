@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	db, err := sqlx.Connect("mysql", "root:mySuperSecretPassword@tcp(localhost:3306)/mysql")
+	db, err := sqlx.Connect("mysql", "root:mySuperSecretPassword@tcp(localhost:3306)/partypher")
 	if err != nil {
 		panic(err)
 	}
@@ -16,5 +16,6 @@ func main() {
 	if err := db.GetContext(context.Background(), &now, "SELECT NOW()"); err != nil {
 		panic(err)
 	}
+
 	println("hello world!", now)
 }
