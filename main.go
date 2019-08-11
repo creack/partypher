@@ -12,9 +12,11 @@ import (
 	"github.com/creack/partypher/api"
 	"github.com/creack/partypher/db"
 	"github.com/google/uuid"
+	"github.com/gorilla/mux"
 	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq" // Load the postgres driver.
 	"github.com/pkg/errors"
+
+	_ "github.com/lib/pq" // Load the postgres driver.
 )
 
 type controller struct {
@@ -132,10 +134,12 @@ func main() {
 		panic(errors.Wrap(err, "newController"))
 	}
 
-	http.HandleFunc("/post", c.createPartHandler)
-	http.HandleFunc("/get", c.getPartHandler)
+	router := mux.NewRouter()
+	router.Methods(http.MethodGet).Path("/").HandlerFunc(c.getPartHandler)
+	router.Methods(http.MethodPost).Path("/").HandlerFunc(c.createPartHandler)
+
 	println("ready!")
-	if err := http.ListenAndServe(":8080", nil); err != nil {
+	if err := http.ListenAndServe(":8080", router); err != nil {
 		panic(err)
 	}
 }
