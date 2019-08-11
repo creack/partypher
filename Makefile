@@ -5,10 +5,15 @@ PG_C        = ${NAME}_pg_c
 PG_PASSWORD = mySuperSecretPassword
 PG_DB       = partypher
 
-PG_ROOT_DSN = postgres://postgres:${PG_PASSWORD}@localhost:5432/${PG_DB}?sslmode=disable
+PG_ROOT_DSN = postgres://postgres:${PG_PASSWORD}@$(shell cat .pg_ip 2> /dev/null):5432/${PG_DB}?sslmode=disable
 export PG_ROOT_DSN
 
 SRCS := $(shell find . -name '*.go' -type f)
+
+GOOSE_DIR        = ./migrations
+GOOSE_SRCS      := $(shell find ${GOOSE_DIR} -name '*.sql' -type f)
+GOOSE_DOCKERFILE = ${GOOSE_DIR}/Dockerfile
+GOOSE_I          = ${NAME}_goose_i
 
 .DELETE_ON_ERROR:
 
@@ -23,13 +28,24 @@ SRCS := $(shell find . -name '*.go' -type f)
 	done
 	@touch $@
 
-.pg: .pg_db
+.pg_ip: .pg_db
+	docker inspect -f '{{.NetworkSettings.IPAddress}}' partypher_pg_c > $@
+
+.goose: ${GOOSE_DOCKERFILE} ${GOOSE_SRCS}
+	docker build -t ${GOOSE_I} -f $< ${GOOSE_DIR}
+	@touch $@
+
+.pg_migrate: .pg_ip .goose
+	docker run --rm ${GOOSE_I} ${PG_ROOT_DSN} up
+	@touch $@
+
+.pg: .pg_migrate
 	@touch $@
 
 .PHONY: pg_clean
 pg_clean:
 	docker rm -f -v ${PG_C} 2> /dev/null > /dev/null || true
-	@rm -f .pg_start .pg .pg_db
+	@rm -f .pg_start .pg .pg_db .pg_ip .pg_migrate .goose
 
 dist/${NAME}: ${SRCS}
 	@mkdir -p $(dir $@)

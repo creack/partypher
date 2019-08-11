@@ -1,4 +1,7 @@
 .pg_start
 .pg
 .pg_db
+.pg_ip
+.pg_migrate
+.goose
 dist/
