@@ -10,7 +10,7 @@ import (
 )
 
 func main() {
-	db, err := sqlx.Connect("postgres", os.Getenv("PG_ROOT_DSN"))
+	db, err := sqlx.Connect("postgres", os.Getenv("PG_DSN"))
 	if err != nil {
 		panic(err)
 	}

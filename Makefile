@@ -2,11 +2,10 @@ NAME = partypher
 
 PG_I        = postgres:12
 PG_C        = ${NAME}_pg_c
-PG_PASSWORD = mySuperSecretPassword
 PG_DB       = partypher
 
-PG_ROOT_DSN = postgres://postgres:${PG_PASSWORD}@$(shell cat .pg_ip 2> /dev/null):5432/${PG_DB}?sslmode=disable
-export PG_ROOT_DSN
+PG_DSN = postgres://postgres@$(shell cat .pg_ip 2> /dev/null):5432/${PG_DB}?sslmode=disable
+export PG_DSN
 
 SRCS := $(shell find . -name '*.go' -type f)
 
@@ -36,7 +35,7 @@ GOOSE_I          = ${NAME}_goose_i
 	@touch $@
 
 .pg_migrate: .pg_ip .goose
-	docker run --rm ${GOOSE_I} ${PG_ROOT_DSN} up
+	docker run --rm ${GOOSE_I} ${PG_DSN} up
 	@touch $@
 
 .pg: .pg_migrate
