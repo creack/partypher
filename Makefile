@@ -57,4 +57,4 @@ start: dist/${NAME} .pg
 .PHONY: clean
 clean: pg_clean
 	@rm -f dist/${NAME}
-	@rmdir dist
+	@rmdir dist 2> /dev/null || true

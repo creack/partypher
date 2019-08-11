@@ -2,72 +2,140 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"encoding/json"
+	"io/ioutil"
+	"log"
+	"net/http"
 	"os"
 	"time"
 
+	"github.com/creack/partypher/api"
+	"github.com/creack/partypher/db"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
-
 	_ "github.com/lib/pq" // Load the postgres driver.
+	"github.com/pkg/errors"
 )
 
-// TimeMetadata is the common time metadata fields for all components.
-type TimeMetadata struct {
-	CreatedAt time.Time `db:"created_at"`
-	UpdatedAt time.Time `db:"updated_at"`
-	DeletedAt time.Time `db:"deleted_at"`
+type controller struct {
+	db *sqlx.DB
 }
 
-// Tag .
-type Tag struct {
-	ID   uuid.UUID
-	Name string
-	TimeMetadata
+func newController(ctx context.Context) (*controller, error) {
+	db, err := sqlx.ConnectContext(ctx, "postgres", os.Getenv("PG_DSN"))
+	if err != nil {
+		return nil, errors.Wrap(err, "sqlx.Connect")
+	}
+	return &controller{db: db}, nil
 }
 
-// // Location represents where part is stored.
-// type Location struct {
-// 	ID uuid.UUID
+func (c *controller) createPartHandler(w http.ResponseWriter, req *http.Request) {
+	ctx := req.Context()
 
-// 	Name string
-// }
+	buf, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		log.Printf("Error consuming body: %s.\n", err)
+		return
+	}
+	_ = req.Body.Close() // Best effort.
 
-// Part .
-type Part struct {
-	ID   uuid.UUID `db:"part_id"`
-	Name string    `db:"part_name"`
+	var reqPart api.CreatePartRequest
+	if err := json.Unmarshal(buf, &reqPart); err != nil {
+		http.Error(w, errors.Wrap(err, "unmarshal body").Error(), http.StatusBadRequest)
+		log.Printf("Error parsing body: %s.\n", err)
+		return
+	}
 
-	// Quantity int
-	// Location Location
+	now := time.Now()
+	dbPart := db.Part{
+		ID:   uuid.New(),
+		Name: reqPart.Name,
+		TimeMetadata: db.TimeMetadata{
+			CreatedAt: now,
+			UpdatedAt: now,
+		},
+	}
 
-	//	Tags []Tag
+	if err := db.InsertPart(ctx, c.db, dbPart); err != nil {
+		log.Printf("Error inserting part in db: %s.\n", err)
+		http.Error(w, "Internal error.", http.StatusInternalServerError)
+		return
+	}
 
-	TimeMetadata
+	w.WriteHeader(http.StatusCreated)
+
+	apiPart := api.Part{
+		ID:   dbPart.ID,
+		Name: dbPart.Name,
+		TimeMetadata: api.TimeMetadata{
+			CreatedAt: dbPart.CreatedAt,
+			UpdatedAt: dbPart.UpdatedAt,
+		},
+	}
+
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+
+	if err := enc.Encode(apiPart); err != nil {
+		log.Printf("Error encoding/sending the api part to the client: %s.\n", err)
+		return
+	}
 }
 
-var _ Part
+func (c *controller) getPartHandler(w http.ResponseWriter, req *http.Request) {
+	if err := req.ParseForm(); err != nil {
+		http.Error(w, errors.Wrap(err, "parseForm").Error(), http.StatusBadRequest)
+		return
+	}
+
+	partID, err := uuid.Parse(req.Form.Get("part_id"))
+	if err != nil {
+		http.Error(w, errors.Wrap(err, "parse partID").Error(), http.StatusBadRequest)
+		return
+	}
+
+	ctx := req.Context()
+
+	dbPart, err := db.GetPart(ctx, c.db, partID)
+	if err != nil {
+		log.Printf("Error getting part in db: %s.\n", err)
+		http.Error(w, "Internal error.", http.StatusInternalServerError)
+		return
+	}
+
+	apiPart := api.Part{
+		ID:   dbPart.ID,
+		Name: dbPart.Name,
+		TimeMetadata: api.TimeMetadata{
+			CreatedAt: dbPart.CreatedAt,
+			UpdatedAt: dbPart.UpdatedAt,
+		},
+	}
+	if !dbPart.DeletedAt.IsZero() {
+		apiPart.TimeMetadata.DeletedAt = &dbPart.DeletedAt
+	}
+
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+
+	if err := enc.Encode(apiPart); err != nil {
+		log.Printf("Error encoding/sending the api part to the client: %s.\n", err)
+		return
+	}
+}
 
 func main() {
 	ctx := context.Background()
-	db, err := sqlx.ConnectContext(ctx, "postgres", os.Getenv("PG_DSN"))
+
+	c, err := newController(ctx)
 	if err != nil {
-		panic(err)
+		panic(errors.Wrap(err, "newController"))
 	}
 
-	p := Part{ID: uuid.New(), Name: "boilerplate part!!"}
-	if _, err := db.NamedExecContext(ctx, `
-INSERT INTO parts
-(part_id, part_name, created_at, updated_at, deleted_at) VALUES
-(:part_id, :part_name, :created_at, :updated_at, :deleted_at)
-`, p); err != nil {
+	http.HandleFunc("/post", c.createPartHandler)
+	http.HandleFunc("/get", c.getPartHandler)
+	println("ready!")
+	if err := http.ListenAndServe(":8080", nil); err != nil {
 		panic(err)
 	}
-
-	var p2 Part
-	if err := db.GetContext(ctx, &p2, db.Rebind("SELECT * FROM parts WHERE part_id = ? LIMIT 1"), p.ID); err != nil {
-		panic(err)
-	}
-
-	fmt.Printf("hello world!-->\n%s\n", p2.Name)
 }
