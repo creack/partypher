@@ -1,4 +1,4 @@
-.mysql_start
-.mysql
-.mysql_db
+.pg_start
+.pg
+.pg_db
 dist/

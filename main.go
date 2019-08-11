@@ -2,13 +2,15 @@ package main
 
 import (
 	"context"
+	"os"
 
-	_ "github.com/go-sql-driver/mysql" // Load the mysql driver.
 	"github.com/jmoiron/sqlx"
+
+	_ "github.com/lib/pq" // Load the postgres driver.
 )
 
 func main() {
-	db, err := sqlx.Connect("mysql", "root:mySuperSecretPassword@tcp(localhost:3306)/partypher")
+	db, err := sqlx.Connect("postgres", os.Getenv("PG_ROOT_DSN"))
 	if err != nil {
 		panic(err)
 	}
