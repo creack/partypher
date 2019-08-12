@@ -15,8 +15,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
-
-	_ "github.com/lib/pq" // Load the postgres driver.
 )
 
 type controller struct {

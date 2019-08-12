@@ -7,6 +7,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
+
+	_ "github.com/lib/pq" // Load the postgres driver.
 )
 
 // TimeMetadata is the common time metadata fields for all components.

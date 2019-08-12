@@ -54,6 +54,10 @@ dist/${NAME}: ${SRCS}
 start: dist/${NAME} .pg
 	@$<
 
+.PHONY: test
+test: .pg
+	go test -v ./db
+
 .PHONY: clean
 clean: pg_clean
 	@rm -f dist/${NAME}
