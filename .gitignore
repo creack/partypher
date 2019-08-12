@@ -4,4 +4,5 @@
 .pg_ip
 .pg_migrate
 .goose
+.docker.base
 dist/

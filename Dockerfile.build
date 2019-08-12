@@ -1,0 +1,5 @@
+ARG BASE
+
+FROM $BASE
+
+RUN make dist/partypher

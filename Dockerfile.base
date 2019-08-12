@@ -1,0 +1,18 @@
+FROM golang:1.12
+
+ENV CGO_ENABLED=0
+
+RUN go build -a -i std
+
+WORKDIR /go/src/github.com/creack/partypher
+
+ADD vendor/ vendor/
+
+RUN go build -i ./vendor/...
+
+ENV GOFLAGS='-mod=vendor'
+
+ADD Makefile main.go ./
+ADD api     ./api
+ADD db      ./db
+

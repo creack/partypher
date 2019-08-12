@@ -10,9 +10,11 @@ export PG_DSN
 SRCS := $(shell find . -name '*.go' -type f)
 
 GOOSE_DIR        = ./migrations
-GOOSE_SRCS      := $(shell find ${GOOSE_DIR} -name '*.sql' -type f)
+GOOSE_SRCS       = $(shell find ${GOOSE_DIR} -name '*.sql' -type f)
 GOOSE_DOCKERFILE = ${GOOSE_DIR}/Dockerfile
 GOOSE_I          = ${NAME}_goose_i
+
+BASE_I = ${NAME}_base
 
 .DELETE_ON_ERROR:
 
@@ -51,14 +53,26 @@ dist/${NAME}: ${SRCS}
 	go build -o $@ .
 
 .PHONY: start
-start: dist/${NAME} .pg
+start: .pg
+
+.PHONY: start-local
+start-local: dist/${NAME} .pg
 	@$<
 
+.docker.base: Dockerfile.base ${SRCS}
+	docker build -t ${BASE_I} -f $< .
+	@touch $@
+
 .PHONY: test
-test: .pg
+test: .docker.base .pg
+	docker run -it --rm -e PG_DSN ${BASE_I} \
+		go test -v ./db
+
+.PHONY: test-local
+test-local: .pg
 	go test -v ./db
 
 .PHONY: clean
 clean: pg_clean
-	@rm -f dist/${NAME}
+	@rm -f dist/${NAME} .docker.base
 	@rmdir dist 2> /dev/null || true

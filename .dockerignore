@@ -1,0 +1,8 @@
+*
+!api
+!db
+!main.go
+!go.mod
+!go.sum
+!vendor
+!Makefile
