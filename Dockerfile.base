@@ -12,7 +12,7 @@ RUN go build -i ./vendor/...
 
 ENV GOFLAGS='-mod=vendor'
 
-ADD Makefile main.go ./
+ADD Makefile main.go main_test.go ./
 ADD api     ./api
 ADD db      ./db
 

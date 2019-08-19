@@ -94,11 +94,11 @@ start: .start
 .PHONY: test
 test: .docker.base .pg
 	docker run -i --rm -e PG_DSN ${BASE_I} \
-		go test -v ./db
+		go test -v ./db .
 
 .PHONY: test-local
 test-local: .pg
-	go test -v ./db
+	go test -v ./db .
 
 .PHONY: clean
 clean: pg_clean

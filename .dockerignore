@@ -2,6 +2,7 @@
 !api
 !db
 !main.go
+!main_test.go
 !go.mod
 !go.sum
 !vendor

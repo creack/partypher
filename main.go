@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"io/ioutil"
 	"log"
@@ -46,6 +47,17 @@ func (c *controller) createPartHandler(w http.ResponseWriter, req *http.Request)
 		return
 	}
 
+	// Input validation.
+	if reqPart.Name == "" {
+		http.Error(w, "missing part name", http.StatusBadRequest)
+		return
+	}
+	if len(reqPart.Name) >= 1024 {
+		http.Error(w, "part name too long", http.StatusBadRequest)
+		return
+	}
+
+	// Map the API request to database model.
 	now := time.Now()
 	dbPart := db.Part{
 		ID:   uuid.New(),
@@ -105,7 +117,11 @@ func (c *controller) getPartHandler(w http.ResponseWriter, req *http.Request) {
 	dbPart, err := db.GetPart(ctx, c.db, partID)
 	if err != nil {
 		log.Printf("Error getting part in db: %s.\n", err)
-		http.Error(w, "Internal error.", http.StatusInternalServerError)
+		if errors.Cause(err) == sql.ErrNoRows {
+			http.Error(w, "Part ID not found.", http.StatusNotFound)
+		} else {
+			http.Error(w, "Internal error.", http.StatusInternalServerError)
+		}
 		return
 	}
 
