@@ -14,7 +14,12 @@ GOOSE_SRCS       = $(shell find ${GOOSE_DIR} -name '*.sql' -type f)
 GOOSE_DOCKERFILE = ${GOOSE_DIR}/Dockerfile
 GOOSE_I          = ${NAME}_goose_i
 
-BASE_I = ${NAME}_base
+BASE_I  = ${NAME}_base
+BUILD_I = ${NAME}_build
+
+NAME_C = ${NAME}_c
+
+CURL_I = golang:1.12
 
 .DELETE_ON_ERROR:
 
@@ -30,7 +35,7 @@ BASE_I = ${NAME}_base
 	@touch $@
 
 .pg_ip: .pg_db
-	docker inspect -f '{{.NetworkSettings.IPAddress}}' partypher_pg_c > $@
+	docker inspect -f '{{.NetworkSettings.IPAddress}}' ${PG_C} > $@
 
 .goose: ${GOOSE_DOCKERFILE} ${GOOSE_SRCS}
 	docker build -t ${GOOSE_I} -f $< ${GOOSE_DIR}
@@ -45,7 +50,7 @@ BASE_I = ${NAME}_base
 
 .PHONY: pg_clean
 pg_clean:
-	docker rm -f -v ${PG_C} 2> /dev/null > /dev/null || true
+	@docker rm -f -v ${PG_C} 2> /dev/null > /dev/null || true
 	@rm -f .pg_start .pg .pg_db .pg_ip .pg_migrate .goose
 
 dist/${NAME}: ${SRCS}
@@ -59,13 +64,36 @@ start: .pg
 start-local: dist/${NAME} .pg
 	@$<
 
+.docker.build: Dockerfile.build .docker.base
+	docker build -t ${BUILD_I} --build-arg BASE=${BASE_I} -f $< .
+	@touch $@
+
+.start_docker: .docker.build .pg_ip
+	@docker rm -f -v ${NAME_C} 2> /dev/null > /dev/null || true
+	docker run -d --name ${NAME_C} -e PG_DSN -p '8080:8080' ${BUILD_I}
+	@touch $@
+
+.start_ip: .start_docker
+	until (docker run --rm -i --link ${NAME_C}:api ${CURL_I} curl -v http://api:8080/healthcheck); do \
+		echo 'Waiting for the api to be ready.' >&2; \
+		sleep 1; \
+	done
+	@echo "API Container ready!" >&2
+	@docker inspect -f '{{.NetworkSettings.IPAddress}}' ${NAME_C} > $@
+
+.start: .start_ip
+	@touch $@
+
+.PHONY: start
+start: .start
+
 .docker.base: Dockerfile.base ${SRCS}
 	docker build -t ${BASE_I} -f $< .
 	@touch $@
 
 .PHONY: test
 test: .docker.base .pg
-	docker run -it --rm -e PG_DSN ${BASE_I} \
+	docker run -i --rm -e PG_DSN ${BASE_I} \
 		go test -v ./db
 
 .PHONY: test-local
@@ -74,5 +102,6 @@ test-local: .pg
 
 .PHONY: clean
 clean: pg_clean
-	@rm -f dist/${NAME} .docker.base
+	@docker rm -f -v ${NAME_C} 2> /dev/null > /dev/null || true
+	@rm -f dist/${NAME} .docker.base .docker.build .start_docker .start_ip .start
 	@rmdir dist 2> /dev/null || true

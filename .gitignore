@@ -5,4 +5,8 @@
 .pg_migrate
 .goose
 .docker.base
+.docker.build
+.start_docker
+.start_ip
+.start
 dist/

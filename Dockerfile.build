@@ -3,3 +3,9 @@ ARG BASE
 FROM $BASE
 
 RUN make dist/partypher
+
+RUN cp dist/partypher /a.out
+
+EXPOSE 8080
+
+ENTRYPOINT ["/a.out"]

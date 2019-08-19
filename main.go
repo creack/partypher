@@ -88,7 +88,13 @@ func (c *controller) getPartHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	partID, err := uuid.Parse(req.Form.Get("part_id"))
+	rawPartID := req.Form.Get("part_id")
+	if rawPartID == "" {
+		http.Error(w, "missing part_id query string", http.StatusBadRequest)
+		return
+	}
+
+	partID, err := uuid.Parse(rawPartID)
 	if err != nil {
 		http.Error(w, errors.Wrap(err, "parse partID").Error(), http.StatusBadRequest)
 		return
@@ -124,6 +130,18 @@ func (c *controller) getPartHandler(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
+func (c *controller) healthcheckHandler(w http.ResponseWriter, req *http.Request) {
+	ctx := req.Context()
+
+	if err := c.db.PingContext(ctx); err != nil {
+		log.Printf("Error ping database: %s.\n", err)
+		http.Error(w, "Internal error.", http.StatusInternalServerError)
+		return
+	}
+
+	// 200.
+}
+
 func main() {
 	ctx := context.Background()
 
@@ -135,6 +153,8 @@ func main() {
 	router := mux.NewRouter()
 	router.Methods(http.MethodGet).Path("/").HandlerFunc(c.getPartHandler)
 	router.Methods(http.MethodPost).Path("/").HandlerFunc(c.createPartHandler)
+
+	router.Methods(http.MethodGet).Path("/healthcheck").HandlerFunc(c.healthcheckHandler)
 
 	println("ready!")
 	if err := http.ListenAndServe(":8080", router); err != nil {
