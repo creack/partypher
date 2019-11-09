@@ -1,4 +1,6 @@
-FROM golang:1.12
+ARG GO_IMAGE=golang:latest
+
+FROM ${GO_IMAGE}
 
 ENV CGO_ENABLED=0
 
@@ -15,4 +17,3 @@ ENV GOFLAGS='-mod=vendor'
 ADD Makefile main.go main_test.go ./
 ADD api     ./api
 ADD db      ./db
-

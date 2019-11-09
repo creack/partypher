@@ -1,8 +1,10 @@
 NAME = partypher
 
-PG_I        = postgres:12
-PG_C        = ${NAME}_pg_c
-PG_DB       = partypher
+GO_I = golang:1.13
+
+PG_I  = postgres:12
+PG_C  = ${NAME}_pg_c
+PG_DB = partypher
 
 PG_DSN = postgres://postgres@$(shell cat .pg_ip 2> /dev/null):5432/${PG_DB}?sslmode=disable
 export PG_DSN
@@ -10,7 +12,7 @@ export PG_DSN
 SRCS := $(shell find . -name '*.go' -type f)
 
 GOOSE_DIR        = ./migrations
-GOOSE_SRCS       = $(shell find ${GOOSE_DIR} -name '*.sql' -type f)
+GOOSE_SRCS       = $(shell find ${GOOSE_DIR} -name '*.sql' -type f 2> /dev/null)
 GOOSE_DOCKERFILE = ${GOOSE_DIR}/Dockerfile
 GOOSE_I          = ${NAME}_goose_i
 
@@ -19,7 +21,7 @@ BUILD_I = ${NAME}_build
 
 NAME_C = ${NAME}_c
 
-CURL_I = golang:1.12
+CURL_I = ${GO_I}
 
 .DELETE_ON_ERROR:
 
@@ -38,7 +40,7 @@ CURL_I = golang:1.12
 	docker inspect -f '{{.NetworkSettings.IPAddress}}' ${PG_C} > $@
 
 .goose: ${GOOSE_DOCKERFILE} ${GOOSE_SRCS}
-	docker build -t ${GOOSE_I} -f $< ${GOOSE_DIR}
+	docker build -t ${GOOSE_I} --build-arg GO_IMAGE=${GO_I} -f $< ${GOOSE_DIR}
 	@touch $@
 
 .pg_migrate: .pg_ip .goose
@@ -74,7 +76,7 @@ start-local: dist/${NAME} .pg
 	@touch $@
 
 .start_ip: .start_docker
-	until (docker run --rm -i --link ${NAME_C}:api ${CURL_I} curl -v http://api:8080/healthcheck); do \
+	until (docker run --rm -i --link ${NAME_C}:api ${CURL_I} curl -s http://api:8080/healthcheck); do \
 		echo 'Waiting for the api to be ready.' >&2; \
 		sleep 1; \
 	done
@@ -88,7 +90,7 @@ start-local: dist/${NAME} .pg
 start: .start
 
 .docker.base: Dockerfile.base ${SRCS}
-	docker build -t ${BASE_I} -f $< .
+	docker build -t ${BASE_I} --build-arg GO_IMAGE=${GO_I} -f $< .
 	@touch $@
 
 .PHONY: test
